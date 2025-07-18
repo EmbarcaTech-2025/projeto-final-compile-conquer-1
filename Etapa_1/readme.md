@@ -2,7 +2,9 @@
 
 ## 📌 Objetivo da Etapa 1
 
-Esta primeira etapa do projeto tem como objetivo identificar o **problema central a ser resolvido**, além de **definir claramente os requisitos** da solução que será desenvolvida. Também foi elaborada a **lista inicial de materiais** necessários com base nas funcionalidades pretendidas.
+Esta primeira etapa do projeto tem como objetivo identificar o **problema central a ser resolvido**, além de **definir claramente os requisitos** da solução que será desenvolvida. Também foi elaborada a **lista inicial de materiais** necessários com base nas funcionalidades pretendidas. O documento completo está disponível em:
+
+📎 [ Projeto Idoso Seguro](https://github.com/EmbarcaTech-2025/projeto-final-compile-conquer-1/blob/main/Etapa_1/Projeto_Idoso_Seguro.pdf)
 
 ## 📄 Conteúdo do PDF Anexado
 
@@ -37,7 +39,9 @@ A lista de periféricos foi elaborada com base no que está disponível no labor
 - Sensores: MPU6050, MAX30100, MQ-02 ou similares
 - Display OLED
 
+
 ---
+
 
 ## 🛠️ Próximos Passos
 
