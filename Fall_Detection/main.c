@@ -40,8 +40,13 @@ void read_accel_gyro_task(void *pvParameters)
     mpu6050_setup_i2c();
     mpu6050_reset();
 
+    mpu6050_set_accel_range(3);
+    mpu6050_set_gyro_range(3);
+
     sensor_data_t sensor_data;
     int16_t temp;
+
+    TickType_t last_wake_time = xTaskGetTickCount();
 
     while (true)
     {
@@ -54,7 +59,7 @@ void read_accel_gyro_task(void *pvParameters)
                    sensor_data.gyro[0], sensor_data.gyro[1], sensor_data.gyro[2],
                    temp);*/
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(5));
     }
 }
 
@@ -62,9 +67,9 @@ void fall_impact_detection_task(void *pvParameters)
 {
     sensor_data_t sensor_data;
 
-    const float ACCEL_SCALE = 16384.0f;
-    const float FREE_FALL_THRESHOLD = 0.5f;
-    const float IMPACT_THRESHOLD = 2.0f;
+    const float ACCEL_SCALE = 2048.0f;
+    const float FREE_FALL_THRESHOLD = 0.3f;
+    const float IMPACT_THRESHOLD = 6.0f;
     bool in_free_fall = false;
 
     while (true)
@@ -263,8 +268,8 @@ int main()
     stdio_init_all();
     sleep_ms(2000);
     printf("Starting project...\n");
-    sensor_queue = xQueueCreate(8, sizeof(sensor_data_t));
-    event_queue = xQueueCreate(8, sizeof(event_type_t));
+    sensor_queue = xQueueCreate(32, sizeof(sensor_data_t));
+    event_queue = xQueueCreate(16, sizeof(event_type_t));
 
     xTaskCreate(read_accel_gyro_task, "ReadAccelGyro", 512, NULL, configMAX_PRIORITIES - 2, NULL);
     xTaskCreate(fall_impact_detection_task, "FallImpactDetection", 512, NULL, configMAX_PRIORITIES - 3, NULL);

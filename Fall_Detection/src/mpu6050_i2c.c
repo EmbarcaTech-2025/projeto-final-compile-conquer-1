@@ -38,6 +38,21 @@ void mpu6050_set_accel_range(uint8_t range) {
     i2c_write_blocking(I2C_PORT, MPU6050_ADDR, buf, 2, false);
 }
 
+uint8_t mpu6050_get_gyro_range() {
+    uint8_t reg = 0x1B;
+    uint8_t val;
+    i2c_write_blocking(I2C_PORT, MPU6050_ADDR, &reg, 1, true);
+    i2c_read_blocking(I2C_PORT, MPU6050_ADDR, &val, 1, false);
+    return (val >> 3) & 0x03; // bits 4:3
+}
+
+void mpu6050_set_gyro_range(uint8_t range) {
+    uint8_t buf[2];
+    buf[0] = 0x1B; // GYRO_CONFIG register
+    buf[1] = range << 3; // bits 3 e 4
+    i2c_write_blocking(I2C_PORT, MPU6050_ADDR, buf, 2, false);
+}
+
 void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp) {
     uint8_t buffer[6];
     uint8_t reg = 0x3B; //MPU6050_REG_ACCEL_XOUT_H
