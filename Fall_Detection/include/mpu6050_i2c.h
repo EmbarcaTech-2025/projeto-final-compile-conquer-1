@@ -9,6 +9,10 @@
 #define ACCEL_SENS_8G  4096.0f
 #define ACCEL_SENS_16G 2048.0f
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void mpu6050_setup_i2c(void);
 void mpu6050_reset(void);
 
@@ -19,5 +23,9 @@ uint8_t mpu6050_get_gyro_range(void); // Returns 0=±250°/s, 1=±500°/s, 2=±1
 void mpu6050_set_gyro_range(uint8_t range); // 0=±250°/s, 1=±500°/s, 2=±1000°/s, 3=±2000°/s
 
 void mpu6050_read_raw(int16_t accel[3], int16_t gyro[3], int16_t *temp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // MPU6050_I2C_H

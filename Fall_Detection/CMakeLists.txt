@@ -38,31 +38,36 @@ message("FreeRTOS Kernel located in ${FREERTOS_PATH}")
 include(pico_sdk_import.cmake)
 include(${FREERTOS_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
 
+
 project(Fall_Detection C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+set(MAIN_TARGET_NAME ${PROJECT_NAME})
+
 # Add executable. Default name is the project name, version 0.1
-add_executable(Fall_Detection
-        main.c
+add_executable(${MAIN_TARGET_NAME}
+        main.cpp
         ./src/mpu6050_i2c.c
         ./mongoose-minimal/mongoose.c
         )
 
-pico_set_program_name(Fall_Detection "Fall_Detection")
-pico_set_program_version(Fall_Detection "0.1")
+add_subdirectory(model)
+
+pico_set_program_name(${MAIN_TARGET_NAME} "${MAIN_TARGET_NAME}")
+pico_set_program_version(${MAIN_TARGET_NAME} "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(Fall_Detection 0)
-pico_enable_stdio_usb(Fall_Detection 1)
+pico_enable_stdio_uart(${MAIN_TARGET_NAME} 0)
+pico_enable_stdio_usb(${MAIN_TARGET_NAME} 1)
 
 # Add the standard library to the build
-target_link_libraries(Fall_Detection
+target_link_libraries(${MAIN_TARGET_NAME}
         pico_stdlib)
 
 # Add the standard include files to the build
-target_include_directories(Fall_Detection PRIVATE
+target_include_directories(${MAIN_TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/include 
         ${CMAKE_CURRENT_LIST_DIR}/src
@@ -70,12 +75,12 @@ target_include_directories(Fall_Detection PRIVATE
 )
 
 # Add any user requested libraries
-target_link_libraries(Fall_Detection 
+target_link_libraries(${MAIN_TARGET_NAME} 
         hardware_i2c
         pico_cyw43_arch_lwip_sys_freertos
         FreeRTOS-Kernel-Heap4
         pico_mbedtls
         )
 
-pico_add_extra_outputs(Fall_Detection)
+pico_add_extra_outputs(${MAIN_TARGET_NAME})
 
