@@ -30,7 +30,7 @@ Este protótipo demonstra as principais funcionalidades do sistema de monitorame
 
 Confira o vídeo abaixo para ver o protótipo em funcionamento, incluindo a detecção de quedas com machine learning embarcado, acionamento do botão de emergência, LEDs para sinalização de status e erros, e envio de notificações:
 
-
+[Assista ao vídeo demonstrativo](https://youtu.be/6EJemtafqjY)
 
 ### 🛠️ Ajustes Planejados para a Versão Final
 
