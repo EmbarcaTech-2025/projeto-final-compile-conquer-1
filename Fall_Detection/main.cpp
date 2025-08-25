@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "hardware/pwm.h"
 #include "mpu6050_i2c.h"
+#include "hardware/watchdog.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -67,6 +69,12 @@ extern "C"
 }
 #endif
 
+#define EMERGENCY_BUTTON_PIN 5
+#define BUZZER_PIN 21
+#define BLUE_LED_PIN 12
+#define RED_LED_PIN 13
+#define GREEN_LED_PIN 11
+
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 #define TELEGRAM_BOT_TOKEN ""
@@ -76,14 +84,21 @@ extern "C"
 const char *url = "https://api.telegram.org/bot" TELEGRAM_BOT_TOKEN "/sendMessage";
 char msg[MSG_BUFFER_SIZE];
 char user_name[50] = "Maria Silva";
-
 struct mg_mgr mongoose_manager;
 
 typedef enum
 {
     EVENT_FALL_DETECTED,
-    EVENT_DAILY_ACTIVITY
+    EVENT_DAILY_ACTIVITY,
+    EVENT_EMERGENCY_BUTTON_PRESSED
 } event_type_t;
+
+typedef enum
+{
+    SYSTEM_STATUS_STARTING,
+    SYSTEM_STATUS_WORKING,
+    SYSTEM_STATUS_ERROR,
+} system_status_t;
 
 typedef struct
 {
@@ -93,13 +108,71 @@ typedef struct
 
 QueueHandle_t sensor_queue;
 QueueHandle_t event_queue;
+QueueHandle_t buzzer_queue;
+QueueHandle_t led_status_queue;
 SemaphoreHandle_t wifi_connected_semaphore;
+SemaphoreHandle_t emergency_button_pressed_semaphore;
 
 volatile bool enabled_http_req = true;
+volatile uint32_t last_button_press_time = 0;
+volatile system_status_t current_system_status = SYSTEM_STATUS_STARTING;
 
-// ML Variables
 static float *g_feature_ptr = NULL;
 
+void led_init()
+{
+
+    gpio_init(BLUE_LED_PIN);
+    gpio_set_dir(BLUE_LED_PIN, GPIO_OUT);
+    gpio_put(BLUE_LED_PIN, 1);
+
+    gpio_init(RED_LED_PIN);
+    gpio_set_dir(RED_LED_PIN, GPIO_OUT);
+    gpio_put(RED_LED_PIN, 0);
+
+    gpio_init(GREEN_LED_PIN);
+    gpio_set_dir(GREEN_LED_PIN, GPIO_OUT);
+    gpio_put(GREEN_LED_PIN, 0);
+}
+
+void update_led_status(system_status_t status)
+{
+    gpio_put(BLUE_LED_PIN, 0);
+    gpio_put(RED_LED_PIN, 0);
+    gpio_put(GREEN_LED_PIN, 0);
+
+    switch (status)
+    {
+    case SYSTEM_STATUS_STARTING:
+        gpio_put(BLUE_LED_PIN, 1);
+        break;
+    case SYSTEM_STATUS_WORKING:
+        gpio_put(GREEN_LED_PIN, 1);
+        break;
+    case SYSTEM_STATUS_ERROR:
+        gpio_put(RED_LED_PIN, 1);
+        break;
+    }
+}
+
+void led_status_task(void *pvParameters)
+{
+    led_init();
+    system_status_t status;
+    while (1)
+    {
+        if (xQueueReceive(led_status_queue, &status, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
+            if (status != current_system_status)
+            {
+                current_system_status = status;
+                update_led_status(status);
+                printf("LED status updated: %d\n", status);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
 
 int get_signal_data(size_t offset, size_t length, float *out_ptr)
 {
@@ -127,7 +200,7 @@ int connect_to_wifi(const char *ssid, const char *password)
         return -1;
     }
     printf("CYW43 architecture initialized successfully.\n");
-    
+
     cyw43_arch_enable_sta_mode();
     printf("STA mode enabled.\n");
 
@@ -137,7 +210,7 @@ int connect_to_wifi(const char *ssid, const char *password)
     while (attempt <= 10)
     {
         printf("WiFi connection attempt %d...\n", attempt + 1);
-        
+
         int connect_result_code = cyw43_arch_wifi_connect_timeout_ms(
             ssid, password, CYW43_AUTH_WPA2_AES_PSK, 30000);
 
@@ -152,7 +225,8 @@ int connect_to_wifi(const char *ssid, const char *password)
             return 0;
         }
 
-        if (attempt < 10) {
+        if (attempt < 10)
+        {
             printf("Waiting 15 seconds before next attempt...\n");
             sleep_ms(15000);
         }
@@ -171,16 +245,18 @@ void wifi_init_task(void *pvParameters)
     printf("Attempting WiFi connection...\n");
     if (connect_to_wifi(WIFI_SSID, WIFI_PASS) != 0)
     {
+        system_status_t error_status = SYSTEM_STATUS_ERROR;
+        xQueueSend(led_status_queue, &error_status, 0);
         printf("CRITICAL: WiFi failed. System will restart.\n");
-        while (1)
-        {
-            printf("System halted - WiFi connection failed\n");
-            vTaskDelay(pdMS_TO_TICKS(60000));
-        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        watchdog_reboot(0, 0, 0);
     }
-    
+
     xSemaphoreGive(wifi_connected_semaphore);
-    
+
+    system_status_t working_status = SYSTEM_STATUS_WORKING;
+    xQueueSend(led_status_queue, &working_status, 0);
+
     printf("WiFi initialization complete. Deleting WiFi init task.\n");
     vTaskDelete(NULL);
 }
@@ -190,10 +266,20 @@ void read_accel_gyro_task(void *pvParameters)
     printf("Accelerometer task waiting for WiFi...\n");
     xSemaphoreTake(wifi_connected_semaphore, portMAX_DELAY);
     xSemaphoreGive(wifi_connected_semaphore);
-    
+
     printf("Starting accelerometer readings...\n");
 
-    mpu6050_setup_i2c();
+    int mpu_result = mpu6050_setup_i2c();
+
+    if (mpu_result != 0)
+    {
+        system_status_t error_status = SYSTEM_STATUS_ERROR;
+        xQueueSend(led_status_queue, &error_status, 0);
+        printf("CRITICAL: MPU6050 setup failed.\n");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        watchdog_reboot(0, 0, 0);
+    }
+
     mpu6050_reset();
     printf("MPU6050 initialized successfully.\n");
 
@@ -204,8 +290,8 @@ void read_accel_gyro_task(void *pvParameters)
     sensor_data_t sensor_data;
     int16_t temp;
 
-    TickType_t last_wake_time = xTaskGetTickCount();
     printf("Starting sensor reading task...\n");
+    TickType_t last_wake_time = xTaskGetTickCount();
 
     while (true)
     {
@@ -222,12 +308,12 @@ void read_accel_gyro_task(void *pvParameters)
     }
 }
 
-void fall_impact_detection_task(void *pvParameters)
+void fall_detection_task(void *pvParameters)
 {
     printf("Fall detection task waiting for WiFi...\n");
     xSemaphoreTake(wifi_connected_semaphore, portMAX_DELAY);
     xSemaphoreGive(wifi_connected_semaphore);
-    
+
     printf("Starting fall detection...\n");
     sensor_data_t sensor_data;
 
@@ -271,7 +357,7 @@ void fall_impact_detection_task(void *pvParameters)
                 EI_IMPULSE_ERROR res = run_classifier(&signal, &result, false);
 
                 if (res == EI_IMPULSE_OK)
-                {   
+                {
                     printf("---------------\n");
                     event_type_t event = EVENT_DAILY_ACTIVITY;
                     for (size_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++)
@@ -280,13 +366,14 @@ void fall_impact_detection_task(void *pvParameters)
                                result.classification[i].label,
                                result.classification[i].value);
 
-                        if (result.classification[i].value > 0.8f &&
+                        if (result.classification[i].value > 0.9f &&
                             strcmp(result.classification[i].label, "Fall") == 0)
                         {
                             event = EVENT_FALL_DETECTED;
                             xQueueSend(event_queue, &event, portMAX_DELAY);
+                            xQueueSend(buzzer_queue, &event, portMAX_DELAY);
                             printf("⚠️ ML DETECTED FALL! ⚠️\n");
-                        }  
+                        }
                     }
                     if (event != EVENT_FALL_DETECTED)
                     {
@@ -295,6 +382,8 @@ void fall_impact_detection_task(void *pvParameters)
                 }
                 else
                 {
+                    system_status_t error_status = SYSTEM_STATUS_ERROR;
+                    xQueueSend(led_status_queue, &error_status, 0);
                     printf("Error running classifier: %d\n", res);
                 }
                 printf("Inference done\n");
@@ -305,8 +394,6 @@ void fall_impact_detection_task(void *pvParameters)
         }
     }
 }
-
-
 
 static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 {
@@ -331,7 +418,7 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 
     case MG_EV_CONNECT:
     {
-        //printf("Connected to server, initializing TLS\n");
+        // printf("Connected to server, initializing TLS\n");
         struct mg_str host = mg_url_host(url);
         struct mg_tls_opts opts = {
             .name = host};
@@ -379,10 +466,21 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
     {
         // Response received
         struct mg_http_message *hm = (struct mg_http_message *)ev_data;
-        //printf("Response: %.*s\n", (int)hm->message.len, hm->message.buf);
+        // printf("Response: %.*s\n", (int)hm->message.len, hm->message.buf);
 
         bool success = (strstr(hm->body.buf, "\"ok\":true") != NULL);
         printf("Telegram response: %s\n", success ? "OK" : "ERROR");
+
+        if (success)
+        {
+            system_status_t working_status = SYSTEM_STATUS_WORKING;
+            xQueueSend(led_status_queue, &working_status, 0);
+        }
+        else
+        {
+            system_status_t error_status = SYSTEM_STATUS_ERROR;
+            xQueueSend(led_status_queue, &error_status, 0);
+        }
 
         c->is_draining = 1;
         if (c->fn_data)
@@ -394,6 +492,8 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
     {
         char *err = (char *)ev_data;
         printf("Error: %s\n", err ? err : "unknown");
+        system_status_t error_status = SYSTEM_STATUS_ERROR;
+        xQueueSend(led_status_queue, &error_status, 0);
         c->is_closing = 1;
         if (c->fn_data)
             *((volatile bool *)c->fn_data) = true;
@@ -408,12 +508,12 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
     }
 }
 
-void mongoose_task(void *pvParameters)
+void network_task(void *pvParameters)
 {
     printf("Mongoose task waiting for WiFi...\n");
     xSemaphoreTake(wifi_connected_semaphore, portMAX_DELAY);
     xSemaphoreGive(wifi_connected_semaphore);
-    
+
     printf("Starting Mongoose HTTP client...\n");
     mg_mgr_init(&mongoose_manager);
     mg_log_set(MG_LL_INFO);
@@ -426,14 +526,122 @@ void mongoose_task(void *pvParameters)
         if (enabled_http_req && xQueueReceive(event_queue, &event, 0) == pdTRUE)
         {
             enabled_http_req = false;
-            //printf("Notification received: %lu\n", event);
+            // printf("Notification received: %lu\n", event);
             if (event == EVENT_FALL_DETECTED)
             {
-                snprintf(msg, sizeof(msg), "🚨 Alert: %s has fallen and might need assistance.", user_name);
-                mg_http_connect(&mongoose_manager, url, http_ev_handler, (void *)&enabled_http_req);
+                snprintf(msg, sizeof(msg), "🚨 Fall Alert: %s has fallen and might need assistance.", user_name);
             }
+            else if (event == EVENT_EMERGENCY_BUTTON_PRESSED)
+            {
+                snprintf(msg, sizeof(msg), "🖲️ Emergency Button: %s has pressed the emergency button and might need assistance.", user_name);
+            }
+
+            mg_http_connect(&mongoose_manager, url, http_ev_handler, (void *)&enabled_http_req);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void emergency_button_callback(uint gpio, uint32_t events)
+{
+    if (gpio == EMERGENCY_BUTTON_PIN)
+    {
+        uint32_t current_time = to_ms_since_boot(get_absolute_time());
+
+        if (current_time - last_button_press_time < 200)
+        {
+            return;
+        }
+        last_button_press_time = current_time;
+
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xSemaphoreGiveFromISR(emergency_button_pressed_semaphore, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void emergency_button_task(void *pvParameters)
+{
+
+    printf("Emergency button task waiting for WiFi...\n");
+    xSemaphoreTake(wifi_connected_semaphore, portMAX_DELAY);
+    xSemaphoreGive(wifi_connected_semaphore);
+
+    gpio_init(EMERGENCY_BUTTON_PIN);
+    gpio_set_dir(EMERGENCY_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(EMERGENCY_BUTTON_PIN);
+
+    gpio_set_irq_enabled_with_callback(EMERGENCY_BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true, emergency_button_callback);
+
+    while (1)
+    {
+        if (xSemaphoreTake(emergency_button_pressed_semaphore, portMAX_DELAY) == pdTRUE)
+        {
+            printf("Emergency button pressed!\n");
+            event_type_t emergency_event = EVENT_EMERGENCY_BUTTON_PRESSED;
+            xQueueSend(event_queue, &emergency_event, portMAX_DELAY);
+            xQueueSend(buzzer_queue, &emergency_event, portMAX_DELAY);
+        }
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+}
+
+void buzzer_init()
+{
+    gpio_set_function(BUZZER_PIN, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(BUZZER_PIN);
+
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, 125.0f);
+    pwm_config_set_wrap(&config, 500);
+    pwm_init(slice_num, &config, true);
+
+    pwm_set_gpio_level(BUZZER_PIN, 0);
+}
+
+void buzzer_beep(int duration_ms)
+{
+    pwm_set_gpio_level(BUZZER_PIN, 250);
+    vTaskDelay(pdMS_TO_TICKS(duration_ms));
+    pwm_set_gpio_level(BUZZER_PIN, 0);
+}
+
+void buzzer_pattern_fall_detected()
+{
+    for (int i = 0; i < 3; i++)
+    {
+        buzzer_beep(200);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+}
+
+void buzzer_pattern_emergency_button()
+{
+    buzzer_beep(150);
+}
+
+void buzzer_task(void *pvParameters)
+{
+    printf("Buzzer task waiting for WiFi...\n");
+    xSemaphoreTake(wifi_connected_semaphore, portMAX_DELAY);
+    xSemaphoreGive(wifi_connected_semaphore);
+
+    buzzer_init();
+
+    event_type_t event;
+    while (1)
+    {
+        if (xQueueReceive(buzzer_queue, &event, portMAX_DELAY) == pdTRUE)
+        {
+            if (event == EVENT_FALL_DETECTED)
+            {
+                buzzer_pattern_fall_detected();
+            }
+            else if (event == EVENT_EMERGENCY_BUTTON_PRESSED)
+            {
+                buzzer_pattern_emergency_button();
+            }
+        }
     }
 }
 
@@ -444,15 +652,29 @@ int main()
     printf("Starting project...\n");
 
     wifi_connected_semaphore = xSemaphoreCreateBinary();
-    
+    emergency_button_pressed_semaphore = xSemaphoreCreateBinary();
+
     sensor_queue = xQueueCreate(500, sizeof(sensor_data_t));
     event_queue = xQueueCreate(16, sizeof(event_type_t));
+    buzzer_queue = xQueueCreate(16, sizeof(event_type_t));
+    led_status_queue = xQueueCreate(8, sizeof(system_status_t));
 
-    xTaskCreate(wifi_init_task, "WiFiInit", 2048, NULL, configMAX_PRIORITIES - 1, NULL);    
+    xTaskCreate(led_status_task, "LEDStatus", 512, NULL, configMAX_PRIORITIES - 1, NULL);
+    sleep_ms(100);
+
+    system_status_t init_status = SYSTEM_STATUS_STARTING;
+    xQueueSend(led_status_queue, &init_status, 0);
+
+    xTaskCreate(wifi_init_task, "WiFiInit", 2048, NULL, configMAX_PRIORITIES - 1, NULL);
     xTaskCreate(read_accel_gyro_task, "ReadAccelGyro", 2048, NULL, configMAX_PRIORITIES - 2, NULL);
-    xTaskCreate(fall_impact_detection_task, "FallImpactDetection", 8192, NULL, configMAX_PRIORITIES - 3, NULL);
-    xTaskCreate(mongoose_task, "Mongoose", 2048, NULL, configMAX_PRIORITIES - 4, NULL);
-    
+    xTaskCreate(emergency_button_task, "EmergencyButton", 512, NULL, configMAX_PRIORITIES - 2, NULL);
+    xTaskCreate(fall_detection_task, "FallDetection", 8192, NULL, configMAX_PRIORITIES - 3, NULL);
+    xTaskCreate(buzzer_task, "Buzzer", 512, NULL, configMAX_PRIORITIES - 4, NULL);
+    xTaskCreate(network_task, "Network", 2048, NULL, configMAX_PRIORITIES - 5, NULL);
+
     vTaskStartScheduler();
-    while (1) {tight_loop_contents();}
+    while (1)
+    {
+        tight_loop_contents();
+    }
 }

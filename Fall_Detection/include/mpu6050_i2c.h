@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-void mpu6050_setup_i2c(void);
+int mpu6050_setup_i2c(void);
 void mpu6050_reset(void);
 
 uint8_t mpu6050_get_accel_range(void); // Returns 0=±2g, 1=±4g, 2=±8g, 3=±16g

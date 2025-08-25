@@ -77,6 +77,7 @@ target_include_directories(${MAIN_TARGET_NAME} PRIVATE
 # Add any user requested libraries
 target_link_libraries(${MAIN_TARGET_NAME} 
         hardware_i2c
+        hardware_pwm
         pico_cyw43_arch_lwip_sys_freertos
         FreeRTOS-Kernel-Heap4
         pico_mbedtls
