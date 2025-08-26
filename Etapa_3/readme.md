@@ -43,11 +43,15 @@ Confira o vídeo abaixo para ver o protótipo em funcionamento, incluindo a dete
 
 ## Dispositivo de Monitoramento de Gases -  Protótipo Funcional 
 
-Adicionar aqui 
+Este projeto implementa um sistema de monitoramento de vazamento de gases inflamáveis utilizando o sensor **MQ-02** integrado a um **Raspberry Pi Pico W**.  
+O sistema tem como objetivo aumentar a segurança de idosos ao utilizar o fogão, detectando a presença de gases perigosos e reagindo automaticamente para evitar acidentes.  
 
 ### ✅ Funcionalidades Implementadas
 
-Adicionar aqui 
+- **Leitura do sensor MQ-02 para monitorar a presença de gases inflamáveis**  
+  Testado e calibrado a partir de um potenciômetro disponível no módulo no MQ-02 capaz de regular o threshold do sensor. Alimentado por uma fonte externa de 5V e a   saída digital utilizada para o monitoramento do gás, foi aplicada em um divisor de tensão para não danificar as GPIO's da placa. A referência comum (GND) da        BitDogLab e da fonte externa foram interligadas.
+- **Acionamento do módulo relé 3,3V**  
+  O relé tem seu acionamento a partir da detecção de nível de gás para controle da válvula solenóide
 
 ### 🎥 Vídeo Demonstrativo
 
@@ -55,4 +59,5 @@ Adicionar aqui
 
 ### 🛠️ Ajustes Planejados para a Versão Final
 
-Adicionar aqui
+-Adicionar o sistema de notificação via Telegram da deteção de vazamentos.
+-Adicionar a válvula solenóide na saída do relé junto a um diodo de roda livre para proteção contra sobrecarga sob o relé.
