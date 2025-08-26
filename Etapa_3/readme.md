@@ -55,8 +55,7 @@ O sistema tem como objetivo aumentar a segurança de idosos ao utilizar o fogão
 
 ### 🎥 Vídeo Demonstrativo
 
-Adicionar aqui
-
+[Assista ao vídeo demonstrativo](https://youtu.be/HjIyCttjUFo?si=U4DNLGq6cq8bxphM)
 ### 🛠️ Ajustes Planejados para a Versão Final
 
 -Adicionar o sistema de notificação via Telegram da deteção de vazamentos.
