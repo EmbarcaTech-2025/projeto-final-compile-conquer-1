@@ -46,17 +46,22 @@ pico_sdk_init()
 
 set(MAIN_TARGET_NAME ${PROJECT_NAME})
 
+file(GLOB SRC_FILES
+        "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/src/*.c"
+)
+
 # Add executable. Default name is the project name, version 0.1
 add_executable(${MAIN_TARGET_NAME}
         main.cpp
-        ./src/mpu6050_i2c.c
+        ${SRC_FILES}
         ./mongoose-minimal/mongoose.c
         )
 
 add_subdirectory(model)
 
 pico_set_program_name(${MAIN_TARGET_NAME} "${MAIN_TARGET_NAME}")
-pico_set_program_version(${MAIN_TARGET_NAME} "0.1")
+pico_set_program_version(${MAIN_TARGET_NAME} "3.0.0")
 
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(${MAIN_TARGET_NAME} 0)

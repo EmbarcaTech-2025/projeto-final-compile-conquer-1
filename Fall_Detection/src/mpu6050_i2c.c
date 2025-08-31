@@ -16,14 +16,17 @@ int mpu6050_setup_i2c()
     sleep_ms(10);
 
     uint8_t wake_cmd[2] = {0x6B, 0x00};
-    if (i2c_write_blocking(I2C_PORT, MPU6050_ADDR, wake_cmd, 2, false) < 0) return -1;
-    
+    if (i2c_write_blocking(I2C_PORT, MPU6050_ADDR, wake_cmd, 2, false) < 0)
+        return -1;
+
     sleep_ms(10);
 
     uint8_t reg = 0x75, val = 0;
-    if (i2c_write_blocking(I2C_PORT, MPU6050_ADDR, &reg, 1, true) < 0) return -2;
-    if (i2c_read_blocking(I2C_PORT, MPU6050_ADDR, &val, 1, false) < 0) return -3;
-    
+    if (i2c_write_blocking(I2C_PORT, MPU6050_ADDR, &reg, 1, true) < 0)
+        return -2;
+    if (i2c_read_blocking(I2C_PORT, MPU6050_ADDR, &val, 1, false) < 0)
+        return -3;
+
     return (val == 0x68 || val == 0x70 || val == 0x71) ? 0 : -4;
 }
 
