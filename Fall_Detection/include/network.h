@@ -15,6 +15,7 @@ typedef struct{
     struct mg_mgr *mgr;
     QueueHandle_t event_queue;
     QueueHandle_t status_queue;
+    QueueHandle_t gps_queue;
     SemaphoreHandle_t wifi_semaphore;
 } network_ctx_t;
 

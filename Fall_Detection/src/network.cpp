@@ -2,6 +2,7 @@
 #include "network.h"
 #include "types.h"
 #include "memory.h"
+#include "gps.h"
 
 static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 {
@@ -131,24 +132,40 @@ void network_task(void *pvParameters)
 
     MG_INFO(("Initialising Mongoose..."));
     event_type_t event;
+    gps_data_t latest_gps_data = {0};
+    char gps_link[128];
+
+
     while (1)
     {
         mg_mgr_poll(net_ctx->mgr, 10);
+
         if (*net_ctx->enable_req && xQueueReceive(net_ctx->event_queue, &event, 0) == pdTRUE)
         {
             *net_ctx->enable_req = false;
-            // printf("Notification received: %lu\n", event);
+
+            if (xQueueReceive(net_ctx->gps_queue, &latest_gps_data, pdMS_TO_TICKS(1000)) == pdTRUE)
+            {
+                gps_get_maps_link(gps_link, sizeof(gps_link), latest_gps_data.lat, latest_gps_data.lon);
+            }
+            else
+            {
+                gps_get_maps_link(gps_link, sizeof(gps_link), latest_gps_data.lat, latest_gps_data.lon);
+            }
+
             if (event == EVENT_FALL_DETECTED)
             {
-                snprintf(net_ctx->msg, net_ctx->msg_size, "🚨 Fall Alert: %s has fallen and might need assistance.", net_ctx->username);
+                snprintf(net_ctx->msg, net_ctx->msg_size, "🚨 Fall Alert: %s has fallen and might need assistance.\nLocation: %s", net_ctx->username, gps_link);
             }
             else if (event == EVENT_EMERGENCY_BUTTON_PRESSED)
             {
-                snprintf(net_ctx->msg, net_ctx->msg_size, "🖲️ Emergency Button: %s has pressed the emergency button and might need assistance.", net_ctx->username);
+                snprintf(net_ctx->msg, net_ctx->msg_size, "🖲️ Emergency Button: %s has pressed the emergency button and might need assistance.\nLocation: %s", net_ctx->username, gps_link);
             }
 
             mg_http_connect(net_ctx->mgr, net_ctx->url, http_ev_handler, (void *)net_ctx);
         }
+        latest_gps_data = {0};
+        memset(gps_link, 0, sizeof(gps_link));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

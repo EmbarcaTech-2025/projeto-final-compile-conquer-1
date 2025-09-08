@@ -56,10 +56,14 @@ int connect_to_wifi(const char *ssid, const char *password)
 void wifi_init_task(void *pvParameters)
 {   
     wifi_ctx_t *wifi_ctx = (wifi_ctx_t *)pvParameters;
+
+    printf("WiFi init task waiting for GPS fix...\n");
+    xSemaphoreTake(wifi_ctx->gps_semaphore, portMAX_DELAY);
+    xSemaphoreGive(wifi_ctx->gps_semaphore);
+
     printf("WiFi initialization task started\n");
     printf("WiFi SSID: %s\n", wifi_ctx->ssid);
 
-    printf("Attempting WiFi connection...\n");
     if (connect_to_wifi(wifi_ctx->ssid, wifi_ctx->password) != 0)
     {
         system_status_t error_status = SYSTEM_STATUS_ERROR;
@@ -69,11 +73,9 @@ void wifi_init_task(void *pvParameters)
         watchdog_reboot(0, 0, 0);
     }
 
+    printf("WiFi initialization complete. Deleting WiFi init task.\n");
     xSemaphoreGive(wifi_ctx->wifi_semaphore);
-
     system_status_t working_status = SYSTEM_STATUS_WORKING;
     xQueueSend(wifi_ctx->status_queue, &working_status, 0);
-
-    printf("WiFi initialization complete. Deleting WiFi init task.\n");
     vTaskDelete(NULL);
 }  

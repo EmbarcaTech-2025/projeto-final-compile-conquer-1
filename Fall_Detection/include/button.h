@@ -10,6 +10,7 @@ typedef struct{
     QueueHandle_t event_queue;
     SemaphoreHandle_t wifi_semaphore;
     QueueHandle_t buzzer_queue;
+    QueueHandle_t gps_req;
     uint32_t last_press_time;
 
 } emergency_button_ctx_t;

@@ -51,12 +51,19 @@ file(GLOB SRC_FILES
         "${CMAKE_CURRENT_LIST_DIR}/src/*.c"
 )
 
+file(GLOB LIB_FILES
+        "${CMAKE_CURRENT_LIST_DIR}/mongoose-minimal/*.c"
+        "${CMAKE_CURRENT_LIST_DIR}/minmea/*.c"
+)
+
 # Add executable. Default name is the project name, version 0.1
 add_executable(${MAIN_TARGET_NAME}
         main.cpp
         ${SRC_FILES}
-        ./mongoose-minimal/mongoose.c
-        )
+        ${LIB_FILES}
+)
+
+set(MINMEA_ENABLE_TESTING OFF CACHE BOOL "Disable minmea unit tests for embedded build" FORCE)
 
 add_subdirectory(model)
 
@@ -77,6 +84,7 @@ target_include_directories(${MAIN_TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include 
         ${CMAKE_CURRENT_LIST_DIR}/src
         ${CMAKE_CURRENT_LIST_DIR}/mongoose-minimal
+        ${CMAKE_CURRENT_LIST_DIR}/minmea
 )
 
 # Add any user requested libraries
@@ -86,7 +94,10 @@ target_link_libraries(${MAIN_TARGET_NAME}
         pico_cyw43_arch_lwip_sys_freertos
         FreeRTOS-Kernel-Heap4
         pico_mbedtls
+        hardware_uart
         )
+
+target_compile_definitions(${MAIN_TARGET_NAME} PRIVATE timegm=mktime)
 
 pico_add_extra_outputs(${MAIN_TARGET_NAME})
 

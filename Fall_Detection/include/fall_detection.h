@@ -9,6 +9,7 @@ typedef struct {
     QueueHandle_t event_queue;
     QueueHandle_t buzzer_queue;
     QueueHandle_t status_queue;
+    QueueHandle_t gps_req;
     SemaphoreHandle_t wifi_semaphore;
 } fall_detection_ctx_t;
 

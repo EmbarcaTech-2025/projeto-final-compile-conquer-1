@@ -88,7 +88,8 @@ void fall_detection_task(void *pvParameters)
                             event = EVENT_FALL_DETECTED;
                             xQueueSend(fall_ctx->event_queue, &event, portMAX_DELAY);
                             xQueueSend(fall_ctx->buzzer_queue, &event, portMAX_DELAY);
-                            printf("⚠️ ML DETECTED FALL! ⚠️\n");
+                            xQueueSend(fall_ctx->gps_req, &event, portMAX_DELAY);
+                            printf("⚠️ MACHINE LEARNING DETECTED FALL! ⚠️\n");
                         }
                     }
                     if (event != EVENT_FALL_DETECTED)

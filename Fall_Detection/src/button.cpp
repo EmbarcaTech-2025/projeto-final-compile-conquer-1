@@ -14,7 +14,7 @@ void emergency_button_callback(uint gpio, uint32_t events)
     {
         uint32_t current_time = to_ms_since_boot(get_absolute_time());
 
-        if (current_time - global_btn_ctx->last_press_time < 200)
+        if (current_time - global_btn_ctx->last_press_time < 300)
         {
             return;
         }
@@ -45,10 +45,12 @@ void emergency_button_task(void *pvParameters)
     {
         if (xSemaphoreTake(btn_ctx->button_semaphore, portMAX_DELAY) == pdTRUE)
         {
-            printf("Emergency button pressed!\n");
+            printf("Emergency button pressed\n");
             event_type_t emergency_event = EVENT_EMERGENCY_BUTTON_PRESSED;
             xQueueSend(btn_ctx->event_queue, &emergency_event, portMAX_DELAY);
             xQueueSend(btn_ctx->buzzer_queue, &emergency_event, portMAX_DELAY);
+            xQueueSend(btn_ctx->gps_req, &emergency_event, portMAX_DELAY);
+
         }
         vTaskDelay(pdMS_TO_TICKS(300));
     }

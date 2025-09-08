@@ -9,6 +9,7 @@ typedef struct {
     const char *password;
     QueueHandle_t status_queue;
     SemaphoreHandle_t wifi_semaphore;
+    SemaphoreHandle_t gps_semaphore;
 } wifi_ctx_t;
 
 int connect_to_wifi(const char *ssid, const char *password);
