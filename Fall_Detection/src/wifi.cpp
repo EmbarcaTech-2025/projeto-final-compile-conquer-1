@@ -68,12 +68,12 @@ void wifi_init_task(void *pvParameters)
     {
         system_status_t error_status = SYSTEM_STATUS_ERROR;
         xQueueSend(wifi_ctx->status_queue, &error_status, 0);
-        printf("CRITICAL: WiFi failed. System will restart.\n");
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        printf("CRITICAL: WiFi failed. Rebooting...\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
         watchdog_reboot(0, 0, 0);
     }
 
-    printf("WiFi initialization complete. Deleting WiFi init task.\n");
+    printf("WiFi initialization complete. Deleting WiFi init task...\n");
     xSemaphoreGive(wifi_ctx->wifi_semaphore);
     system_status_t working_status = SYSTEM_STATUS_WORKING;
     xQueueSend(wifi_ctx->status_queue, &working_status, 0);

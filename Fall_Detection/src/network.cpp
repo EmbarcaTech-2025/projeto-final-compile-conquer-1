@@ -3,6 +3,7 @@
 #include "types.h"
 #include "memory.h"
 #include "gps.h"
+#include "task_watchdog.h"
 
 static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 {
@@ -120,6 +121,7 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 
 void network_task(void *pvParameters)
 {
+    watchdog_register_task("Network");
     network_ctx_t *net_ctx = (network_ctx_t *)pvParameters;
 
     printf("Mongoose task waiting for WiFi...\n");
@@ -138,6 +140,7 @@ void network_task(void *pvParameters)
 
     while (1)
     {
+        watchdog_task_alive("Network");
         mg_mgr_poll(net_ctx->mgr, 10);
 
         if (*net_ctx->enable_req && xQueueReceive(net_ctx->event_queue, &event, 0) == pdTRUE)

@@ -47,9 +47,9 @@ void emergency_button_task(void *pvParameters)
         {
             printf("Emergency button pressed\n");
             event_type_t emergency_event = EVENT_EMERGENCY_BUTTON_PRESSED;
-            xQueueSend(btn_ctx->event_queue, &emergency_event, portMAX_DELAY);
-            xQueueSend(btn_ctx->buzzer_queue, &emergency_event, portMAX_DELAY);
-            xQueueSend(btn_ctx->gps_req, &emergency_event, portMAX_DELAY);
+            xQueueSend(btn_ctx->event_queue, &emergency_event, 0);
+            xQueueSend(btn_ctx->buzzer_queue, &emergency_event, 0);
+            xQueueSend(btn_ctx->gps_req, &emergency_event, 0);
 
         }
         vTaskDelay(pdMS_TO_TICKS(300));

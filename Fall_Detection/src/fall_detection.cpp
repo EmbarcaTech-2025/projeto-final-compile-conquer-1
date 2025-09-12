@@ -3,6 +3,7 @@
 #include "types.h"
 #include "edge-impulse-sdk/classifier/ei_run_classifier.h"
 #include "memory.h"
+#include "task_watchdog.h"
 
 static float *g_feature_ptr = NULL;
 
@@ -21,25 +22,24 @@ int get_signal_data(size_t offset, size_t length, float *out_ptr)
     return 0;
 }
 
-
 void fall_detection_task(void *pvParameters)
 {
+    watchdog_register_task("FallDetect");
     fall_detection_ctx_t *fall_ctx = (fall_detection_ctx_t *)pvParameters;
 
     printf("Fall detection task waiting for WiFi...\n");
     xSemaphoreTake(fall_ctx->wifi_semaphore, portMAX_DELAY);
     xSemaphoreGive(fall_ctx->wifi_semaphore);
 
-    printf("Starting fall detection...\n");
     sensor_data_t sensor_data;
-
     static float features[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE];
     static size_t feature_index = 0;
-
     g_feature_ptr = features;
 
+    printf("Starting fall detection...\n");
     while (true)
     {
+        watchdog_task_alive("FallDetect");
         if (xQueueReceive(fall_ctx->sensor_queue, &sensor_data, portMAX_DELAY) == pdTRUE)
         {
             int16_t ax = sensor_data.accel[0];
@@ -86,9 +86,9 @@ void fall_detection_task(void *pvParameters)
                             strcmp(result.classification[i].label, "Fall") == 0)
                         {
                             event = EVENT_FALL_DETECTED;
-                            xQueueSend(fall_ctx->event_queue, &event, portMAX_DELAY);
-                            xQueueSend(fall_ctx->buzzer_queue, &event, portMAX_DELAY);
-                            xQueueSend(fall_ctx->gps_req, &event, portMAX_DELAY);
+                            xQueueSend(fall_ctx->event_queue, &event, 0);
+                            xQueueSend(fall_ctx->buzzer_queue, &event, 0);
+                            xQueueSend(fall_ctx->gps_req, &event, 0);
                             printf("⚠️ MACHINE LEARNING DETECTED FALL! ⚠️\n");
                         }
                     }

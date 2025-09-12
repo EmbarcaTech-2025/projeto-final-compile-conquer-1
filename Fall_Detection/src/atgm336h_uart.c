@@ -2,10 +2,10 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
+#include "hardware/watchdog.h"
 #include "atgm336h_uart.h"
 #include "FreeRTOS.h"
 #include "task.h"
-
 
 #define UART_ID uart1
 #define BAUD_RATE 9600
@@ -22,7 +22,7 @@ bool atgm336h_uart_init()
     }
     gpio_set_function(ATGM336H_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(ATGM336H_RX_PIN, GPIO_FUNC_UART);
-    
+
     uart_set_format(UART_ID, 8, 1, UART_PARITY_NONE);
     uart_set_fifo_enabled(UART_ID, true);
 
@@ -32,31 +32,34 @@ bool atgm336h_uart_init()
     uart_puts(UART_ID, "$PCAS03,1,0,0,0,0,0,0,0,0,0,0,0,0,0*03\r\n");
     sleep_ms(1000);
 
-    printf("Waiting gps module to respond...\n");
-    
     bool gps_detected = false;
-    uint32_t timeout = 5000;
-    
-    while (timeout > 0 && !gps_detected) {
-        if (uart_is_readable(UART_ID)) {
+    uint32_t timeout = 1000;
+
+    while (timeout > 0 && !gps_detected)
+    {
+        if (uart_is_readable(UART_ID))
+        {
             char c = uart_getc(UART_ID);
-            if (c == '$') {
+            if (c == '$')
+            {
                 gps_detected = true;
                 printf("GPS module detected\n");
                 break;
             }
-        } else {
+        }
+        else
+        {
+            watchdog_update();
             vTaskDelay(pdMS_TO_TICKS(10));
             timeout -= 10;
         }
     }
-    
-    if (!gps_detected) {
-        printf("Warning: No GPS detected\n");
+
+    if (!gps_detected)
+    {
+        printf("Error: No GPS detected\n");
         return false;
     }
-    
-    printf("ATGM336H UART init complete\n");
     return true;
 }
 
@@ -67,11 +70,12 @@ int atgm336h_uart_read_line(char *buf, size_t bufsize)
     size_t i = 0;
     bool found_start = false;
     memset(buf, 0, bufsize);
-    
-    while (uart_is_readable(UART_ID)) {
+
+    while (uart_is_readable(UART_ID))
+    {
         uart_getc(UART_ID);
     }
-    
+
     while (timeout < max_timeout && !found_start)
     {
         if (uart_is_readable(UART_ID))
@@ -85,13 +89,15 @@ int atgm336h_uart_read_line(char *buf, size_t bufsize)
             }
             timeout = 0;
         }
-        else {
+        else
+        {
             vTaskDelay(pdMS_TO_TICKS(1));
             timeout++;
         }
     }
 
-    if (!found_start) {
+    if (!found_start)
+    {
         return 0;
     }
 
@@ -101,17 +107,18 @@ int atgm336h_uart_read_line(char *buf, size_t bufsize)
         if (uart_is_readable(UART_ID))
         {
             char c = uart_getc(UART_ID);
-            
-            if (c == '$' && i > 1) {
+
+            if (c == '$' && i > 1)
+            {
                 i = 0;
                 buf[i++] = c;
                 timeout = 0;
                 continue;
             }
-            
+
             buf[i++] = c;
-            
-            if (i >= 2 && buf[i-2] == '\r' && buf[i-1] == '\n')
+
+            if (i >= 2 && buf[i - 2] == '\r' && buf[i - 1] == '\n')
             {
                 buf[i] = '\0';
                 valid_sentence = true;
@@ -119,12 +126,13 @@ int atgm336h_uart_read_line(char *buf, size_t bufsize)
             }
             timeout = 0;
         }
-        else {
+        else
+        {
             vTaskDelay(pdMS_TO_TICKS(1));
             timeout++;
         }
     }
-    
+
     buf[i] = '\0';
     return valid_sentence ? i : 0;
 }

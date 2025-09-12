@@ -7,6 +7,7 @@
 #include "gps.h"
 #include "types.h"
 #include "hardware/watchdog.h"
+#include "task_watchdog.h"
 
 void gps_get_maps_link(char *buffer, size_t buffer_size, double lat, double lon)
 {
@@ -35,7 +36,8 @@ bool parse_nmea_sentence(const char *sentence, gps_data_t *data)
         struct minmea_sentence_gga gga = {0};
         if (minmea_parse_gga(&gga, sentence))
         {
-            if (gga.fix_quality ==0 || gga.latitude.scale == 0 || gga.longitude.scale == 0) {
+            if (gga.fix_quality == 0 || gga.latitude.scale == 0 || gga.longitude.scale == 0)
+            {
                 data->fix = false;
                 return false;
             }
@@ -45,7 +47,8 @@ bool parse_nmea_sentence(const char *sentence, gps_data_t *data)
             float longitude = minmea_tocoord(&gga.longitude);
 
             if (isinf(latitude) || isnan(latitude) || isinf(longitude) || isnan(longitude) ||
-                latitude < -90.0f || latitude > 90.0f || longitude < -180.0f || longitude > 180.0f) {
+                latitude < -90.0f || latitude > 90.0f || longitude < -180.0f || longitude > 180.0f)
+            {
                 data->fix = false;
                 return false;
             }
@@ -65,60 +68,24 @@ bool parse_nmea_sentence(const char *sentence, gps_data_t *data)
     return false;
 }
 
-void gps_init_task(void *pvParameters)
+void gps_init(gps_init_ctx_t *gps_init)
 {
-    printf("Starting GPS init task...\n");
-    gps_init_ctx_t *gps_init_ctx = (gps_init_ctx_t *)pvParameters;
-    
-    int attempts = 0;
-    const int max_attempts = 60;
-    char nmea_sentence[128];
-    gps_data_t latest_gps_data = {0};
     system_status_t error_status = SYSTEM_STATUS_ERROR;
 
     if (atgm336h_uart_init() != true)
     {
-        xQueueSend(gps_init_ctx->status_queue, &error_status, 0);
-        printf("CRITICAL: ATGM336H UART init failed. System will restart.\n");
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        xQueueSend(gps_init->status_queue, &error_status, 0);
+        printf("CRITICAL: ATGM336H UART init failed. Rebooting...\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
         watchdog_reboot(0, 0, 0);
     }
 
-    printf("GPS location fix waiting...\n");
-    while (1)
-    {
-        while (attempts < max_attempts)
-        {
-            int len = atgm336h_uart_read_line(nmea_sentence, sizeof(nmea_sentence));
-            if (len > 0)
-            {
-                if (parse_nmea_sentence(nmea_sentence, &latest_gps_data) && latest_gps_data.fix)
-                {
-                    
-                    printf("GPS location fix acquired.\n");
-                    xSemaphoreGive(gps_init_ctx->gps_semaphore);
-                    vTaskDelete(NULL);
-                    return;
-                }
-                else
-                {
-                    printf("No GPS location fix yet. Retrying...%d/%d\n", attempts, max_attempts);
-                }
-            }
-
-            attempts++;
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-        
-        xQueueSend(gps_init_ctx->status_queue, &error_status, 0);
-        printf("CRITICAL: GPS fix failed. System will restart.\n");
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        watchdog_reboot(0, 0, 0);
-    }
+    xSemaphoreGive(gps_init->gps_semaphore);
 }
 
 void gps_location_task(void *pvParameters)
 {
+    watchdog_register_task("GPSLoc");
     gps_ctx_t *gps_ctx = (gps_ctx_t *)pvParameters;
 
     printf("GPS location task waiting for WiFi...\n");
@@ -131,7 +98,8 @@ void gps_location_task(void *pvParameters)
 
     while (1)
     {
-        if (xQueueReceive(gps_ctx->gps_req, &request, portMAX_DELAY) == pdTRUE)
+        watchdog_task_alive("GPSLoc");
+        if (xQueueReceive(gps_ctx->gps_req, &request, pdMS_TO_TICKS(10000)) == pdTRUE)
         {
             if (request == EVENT_FALL_DETECTED || request == EVENT_EMERGENCY_BUTTON_PRESSED)
             {
@@ -142,8 +110,11 @@ void gps_location_task(void *pvParameters)
                     {
                         printf("GPS get location: Ok\n");
                         xQueueSend(gps_ctx->gps_queue, &latest_gps_data, 0);
-                    } else {
-                        printf("GPS get location: Failed\n");
+                    }
+                    else
+                    {
+                        printf("GPS get location: Failed. Sending empty gps data.\n");
+                        xQueueSend(gps_ctx->gps_queue, &latest_gps_data, 0);
                     }
                 }
             }

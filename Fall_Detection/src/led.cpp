@@ -2,6 +2,7 @@
 #include "types.h"
 #include <stdio.h>
 #include "hardware/gpio.h"
+#include "task_watchdog.h"
 
 void led_rgb_init(led_ctx_t *led_ctx)
 {
@@ -41,11 +42,13 @@ void led_rgb_update_status(led_ctx_t *led_ctx, system_status_t status)
 
 void led_rgb_status_task(void *pvParameters)
 {   
+    watchdog_register_task("LED");
     led_ctx_t *led_ctx = (led_ctx_t *)pvParameters;
     led_rgb_init(led_ctx);
     system_status_t status;
     while (1)
     {
+        watchdog_task_alive("LED");
         if (xQueueReceive(led_ctx->status_queue, &status, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             if (status != led_ctx->current_status)

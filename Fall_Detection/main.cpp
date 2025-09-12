@@ -17,6 +17,7 @@
 #include "network.h"
 #include "gps.h"
 #include "atgm336h_uart.h"
+#include "task_watchdog.h"
 
 // -----NETWORK VARIABLES ------
 #define WIFI_SSID ""
@@ -58,15 +59,16 @@ QueueHandle_t event_queue;
 // ------GPS------
 QueueHandle_t gps_queue;
 QueueHandle_t gps_request_location_queue;
-SemaphoreHandle_t gps_fixed_semaphore;
+SemaphoreHandle_t gps_init_semaphore;
 
 int main()
 {
     stdio_init_all();
     sleep_ms(2000);
     printf("\nStarting project...\n");
+    watchdog_init();
 
-    gps_fixed_semaphore = xSemaphoreCreateBinary();
+    gps_init_semaphore = xSemaphoreCreateBinary();
     wifi_connected_semaphore = xSemaphoreCreateBinary();
     emergency_button_pressed_semaphore = xSemaphoreCreateBinary();
 
@@ -77,6 +79,13 @@ int main()
     gps_queue = xQueueCreate(16, sizeof(gps_data_t));
     gps_request_location_queue = xQueueCreate(16, sizeof(event_type_t));
 
+    system_status_t init_status = SYSTEM_STATUS_STARTING;
+    xQueueSend(led_status_queue, &init_status, 0);
+
+    watchdog_ctx_t watchdog_ctx = {
+        .status_queue = led_status_queue};
+    xTaskCreate(watchdog_monitor_task, "WatchdogMonitor", 1024, &watchdog_ctx, configMAX_PRIORITIES - 1, NULL);
+
     led_ctx_t led_ctx = {
         .red_pin = RED_LED_PIN,
         .green_pin = GREEN_LED_PIN,
@@ -84,32 +93,27 @@ int main()
         .status_queue = led_status_queue,
         .current_status = SYSTEM_STATUS_STARTING};
     xTaskCreate(led_rgb_status_task, "LEDStatus", 512, &led_ctx, configMAX_PRIORITIES - 1, NULL);
-    sleep_ms(100);
-
+    //sleep_ms(100);
+    
     gps_init_ctx_t gps_init_ctx = {
         .gps_queue = gps_queue,
-        .gps_req = gps_request_location_queue,
-        .gps_semaphore = gps_fixed_semaphore,
+        .gps_semaphore = gps_init_semaphore,
         .status_queue = led_status_queue};
-    xTaskCreate(gps_init_task, "GPSInit", 1024, &gps_init_ctx, configMAX_PRIORITIES - 1, NULL);
-
-    system_status_t init_status = SYSTEM_STATUS_STARTING;
-    xQueueSend(led_status_queue, &init_status, 0);
+    gps_init(&gps_init_ctx);
 
     wifi_ctx_t wifi_ctx = {
         .ssid = WIFI_SSID,
         .password = WIFI_PASS,
         .status_queue = led_status_queue,
         .wifi_semaphore = wifi_connected_semaphore,
-        .gps_semaphore = gps_fixed_semaphore
-    };
-    xTaskCreate(wifi_init_task, "WiFiInit", 2048, &wifi_ctx, configMAX_PRIORITIES - 2, NULL);
+        .gps_semaphore = gps_init_semaphore};
+    xTaskCreate(wifi_init_task, "WiFiInit", 2048, &wifi_ctx, configMAX_PRIORITIES - 1, NULL);
 
     sensor_ctx_t sensor_ctx = {
         .sensor_queue = sensor_queue,
         .wifi_semaphore = wifi_connected_semaphore,
         .status_queue = led_status_queue};
-    xTaskCreate(read_accel_gyro_task, "ReadAccelGyro", 2048, &sensor_ctx, configMAX_PRIORITIES - 3, NULL);
+    xTaskCreate(read_accel_gyro_task, "ReadAccelGyro", 2048, &sensor_ctx, configMAX_PRIORITIES - 2, NULL);
 
     emergency_button_ctx_t button_ctx = {
         .button_pin = EMERGENCY_BUTTON_PIN,
@@ -119,7 +123,7 @@ int main()
         .buzzer_queue = buzzer_queue,
         .gps_req = gps_request_location_queue,
         .last_press_time = last_button_press_time};
-    xTaskCreate(emergency_button_task, "EmergencyButton", 512, &button_ctx, configMAX_PRIORITIES - 3, NULL);
+    xTaskCreate(emergency_button_task, "EmergencyButton", 512, &button_ctx, configMAX_PRIORITIES - 2, NULL);
 
     fall_detection_ctx_t fall_ctx = {
         .sensor_queue = sensor_queue,
@@ -127,20 +131,20 @@ int main()
         .buzzer_queue = buzzer_queue,
         .gps_req = gps_request_location_queue,
         .wifi_semaphore = wifi_connected_semaphore};
-    xTaskCreate(fall_detection_task, "FallDetection", 8192, &fall_ctx, configMAX_PRIORITIES - 4, NULL);
+    xTaskCreate(fall_detection_task, "FallDetection", 8192, &fall_ctx, configMAX_PRIORITIES - 3, NULL);
 
     buzzer_ctx_t buzzer_ctx = {
         .buzzer_pin = BUZZER_PIN,
         .buzzer_queue = buzzer_queue,
         .wifi_semaphore = wifi_connected_semaphore};
-    xTaskCreate(buzzer_task, "Buzzer", 512, &buzzer_ctx, configMAX_PRIORITIES - 5, NULL);
+    xTaskCreate(buzzer_task, "Buzzer", 512, &buzzer_ctx, configMAX_PRIORITIES - 4, NULL);
 
     gps_ctx_t gps_ctx = {
         .gps_queue = gps_queue,
         .gps_req = gps_request_location_queue,
         .wifi_semaphore = wifi_connected_semaphore,
     };
-    xTaskCreate(gps_location_task, "GPSLocation", 1024, &gps_ctx, configMAX_PRIORITIES - 6, NULL);
+    xTaskCreate(gps_location_task, "GPSLocation", 1024, &gps_ctx, configMAX_PRIORITIES - 5, NULL);
 
     network_ctx_t network_ctx = {
         .enable_req = &enabled_http_req,
@@ -154,7 +158,7 @@ int main()
         .status_queue = led_status_queue,
         .gps_queue = gps_queue,
         .wifi_semaphore = wifi_connected_semaphore};
-    xTaskCreate(network_task, "Network", 2048, &network_ctx, configMAX_PRIORITIES - 7, NULL);
+    xTaskCreate(network_task, "Network", 2048, &network_ctx, configMAX_PRIORITIES - 6, NULL);
 
     vTaskStartScheduler();
     while (1)
