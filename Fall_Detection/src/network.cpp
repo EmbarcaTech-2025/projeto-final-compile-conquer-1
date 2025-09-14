@@ -121,12 +121,13 @@ static void http_ev_handler(struct mg_connection *c, int ev, void *ev_data)
 
 void network_task(void *pvParameters)
 {
-    watchdog_register_task("Network");
     network_ctx_t *net_ctx = (network_ctx_t *)pvParameters;
 
     printf("Mongoose task waiting for WiFi...\n");
     xSemaphoreTake(net_ctx->wifi_semaphore, portMAX_DELAY);
     xSemaphoreGive(net_ctx->wifi_semaphore);
+
+    watchdog_register_task("Network");
 
     printf("Starting Mongoose HTTP client...\n");
     mg_mgr_init(net_ctx->mgr);

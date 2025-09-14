@@ -24,12 +24,13 @@ int get_signal_data(size_t offset, size_t length, float *out_ptr)
 
 void fall_detection_task(void *pvParameters)
 {
-    watchdog_register_task("FallDetect");
     fall_detection_ctx_t *fall_ctx = (fall_detection_ctx_t *)pvParameters;
 
     printf("Fall detection task waiting for WiFi...\n");
     xSemaphoreTake(fall_ctx->wifi_semaphore, portMAX_DELAY);
     xSemaphoreGive(fall_ctx->wifi_semaphore);
+
+    watchdog_register_task("FallDetect");
 
     sensor_data_t sensor_data;
     static float features[EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE];

@@ -56,6 +56,8 @@ file(GLOB LIB_FILES
         "${CMAKE_CURRENT_LIST_DIR}/minmea/*.c"
 )
 
+add_definitions(-DMG_ENABLE_DNS_SERVER=1)
+
 # Add executable. Default name is the project name, version 0.1
 add_executable(${MAIN_TARGET_NAME}
         main.cpp

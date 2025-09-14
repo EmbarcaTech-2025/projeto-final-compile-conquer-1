@@ -24,11 +24,11 @@ int connect_to_wifi(const char *ssid, const char *password)
 
     int attempt = 0;
     while (attempt <= 10)
-    {
+    {   
         printf("WiFi connection attempt %d...\n", attempt + 1);
 
         int connect_result_code = cyw43_arch_wifi_connect_timeout_ms(
-            ssid, password, CYW43_AUTH_WPA2_AES_PSK, 30000);
+            ssid, password, CYW43_AUTH_WPA2_AES_PSK, 2500);
 
         if (connect_result_code != 0)
         {
@@ -43,8 +43,8 @@ int connect_to_wifi(const char *ssid, const char *password)
 
         if (attempt < 10)
         {
-            printf("Waiting 15 seconds before next attempt...\n");
-            sleep_ms(15000);
+            printf("Waiting 2 seconds before next attempt...\n");
+            sleep_ms(2500);
         }
         attempt++;
     }

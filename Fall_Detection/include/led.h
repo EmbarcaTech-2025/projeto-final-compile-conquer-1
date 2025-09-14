@@ -1,4 +1,4 @@
-#pragma _once
+#pragma once
 
 #include "types.h"
 #include "FreeRTOS.h"

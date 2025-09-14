@@ -85,12 +85,13 @@ void gps_init(gps_init_ctx_t *gps_init)
 
 void gps_location_task(void *pvParameters)
 {
-    watchdog_register_task("GPSLoc");
     gps_ctx_t *gps_ctx = (gps_ctx_t *)pvParameters;
 
     printf("GPS location task waiting for WiFi...\n");
     xSemaphoreTake(gps_ctx->wifi_semaphore, portMAX_DELAY);
     xSemaphoreGive(gps_ctx->wifi_semaphore);
+
+    watchdog_register_task("GPSLoc");
 
     char nmea_sentence[128];
     event_type_t request;

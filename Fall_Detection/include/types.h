@@ -10,6 +10,7 @@ typedef enum
 
 typedef enum
 {
+    SYSTEM_STATUS_CONFIG,
     SYSTEM_STATUS_STARTING,
     SYSTEM_STATUS_WORKING,
     SYSTEM_STATUS_ERROR,

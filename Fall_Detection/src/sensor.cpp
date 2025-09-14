@@ -7,12 +7,13 @@
 
 void read_accel_gyro_task(void *pvParameters)
 {
-    watchdog_register_task("AccelGyro");
     sensor_ctx_t *sensor_ctx = (sensor_ctx_t *)pvParameters;
 
     printf("Accelerometer task waiting for WiFi...\n");
     xSemaphoreTake(sensor_ctx->wifi_semaphore, portMAX_DELAY);
     xSemaphoreGive(sensor_ctx->wifi_semaphore);
+
+    watchdog_register_task("AccelGyro");
 
     int mpu_result = mpu6050_setup_i2c();
     if (mpu_result != 0)

@@ -37,27 +37,47 @@ void led_rgb_update_status(led_ctx_t *led_ctx, system_status_t status)
     case SYSTEM_STATUS_ERROR:
         gpio_put(led_ctx->red_pin, 1);
         break;
+    case SYSTEM_STATUS_CONFIG:
+        break;
     }
 }
 
 void led_rgb_status_task(void *pvParameters)
 {   
-    watchdog_register_task("LED");
+    printf("LED status task starting...\n");
     led_ctx_t *led_ctx = (led_ctx_t *)pvParameters;
+
     led_rgb_init(led_ctx);
     system_status_t status;
+    bool config_led_on = false;
+    TickType_t last_toggle = xTaskGetTickCount();
     while (1)
     {
-        watchdog_task_alive("LED");
         if (xQueueReceive(led_ctx->status_queue, &status, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             if (status != led_ctx->current_status)
             {
                 led_ctx->current_status = status;
                 led_rgb_update_status(led_ctx, status);
-                printf("LED status updated: %d\n", status);
+                printf("LED status changed: %d\n", status);
+                if (status == SYSTEM_STATUS_CONFIG)
+                {
+                    config_led_on = false;
+                    last_toggle = xTaskGetTickCount();
+                }
             }
         }
+        if (led_ctx->current_status == SYSTEM_STATUS_CONFIG)
+        {
+            TickType_t now = xTaskGetTickCount();
+            if (now - last_toggle >= pdMS_TO_TICKS(300))
+            {
+                last_toggle = now;
+                config_led_on = !config_led_on;
+                gpio_put(led_ctx->blue_pin, config_led_on ? 1 : 0);
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
