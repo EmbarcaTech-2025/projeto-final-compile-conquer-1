@@ -40,8 +40,8 @@ static int mg_http_match_uri(const struct mg_http_message *hm, const char *glob)
 #define CONFIG_MAGIC_NUMBER 0xCAFEF00D
 
 // --- Configuração fixa do Telegram ---
-#define TELEGRAM_TOKEN   "7949860310:AAExh7tT3l7KlwbESUgODVaZwywZiIwZ5Yw"
-#define TELEGRAM_CHAT_ID "1529055878"
+#define TELEGRAM_TOKEN   ""
+#define TELEGRAM_CHAT_ID ""
 
 // --- Estrutura de Configuração ---
 typedef struct {
