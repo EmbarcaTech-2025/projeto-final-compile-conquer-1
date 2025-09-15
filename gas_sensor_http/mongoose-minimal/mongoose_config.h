@@ -1,0 +1,3 @@
+#define MG_ENABLE_LWIP 1
+#define MG_ENABLE_MBEDTLS 1
+#define MG_TLS MG_TLS_MBED
