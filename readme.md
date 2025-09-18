@@ -1,6 +1,6 @@
-# 🧓 Projeto Idoso Seguro para Familias e Casas de Repouso 🧓
+# 🧓 Projeto Idoso Seguro
 
-## Sobre o Projeto
+## Sobre
 
 O Idoso Seguro é um ecossistema de soluções tecnológicas voltadas para famílias e instituições que cuidam de idosos, com o objetivo de aumentar a segurança, a autonomia e a qualidade do cuidado. O sistema permite que cuidadores monitorem um ou vários idosos simultaneamente, centralizando informações essenciais e agilizando respostas em situações de emergência.
 
@@ -41,7 +41,7 @@ Principais funcionalidades do sistema de monitoramento corporal para idosos em c
 
 Confira o vídeo abaixo para ver o protótipo em funcionamento:
 
-[Assista ao vídeo demonstrativo do Dispositivo de Monitoramento Corporal]()
+[Assista ao vídeo demonstrativo do Dispositivo de Monitoramento Corporal](https://youtu.be/jmjdDbjIJ9U)
 
 
 ### Documentação do Dispositivo de Monitoramento Corporal
