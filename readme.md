@@ -73,7 +73,7 @@ O sistema tem como objetivo aumentar a segurança de idosos ao utilizar o fogão
 
 Confira o vídeo abaixo para ver o protótipo em funcionamento:
 
-[Assista ao vídeo demonstrativo do Dispositivo de Monitoramento de Gases]()
+[Assista ao vídeo demonstrativo do Dispositivo de Monitoramento de Gases](https://youtu.be/_4dGmFTwYp0)
 
 
 ### Documentação do Dispositivo de Monitoramento de Gases
