@@ -60,3 +60,8 @@ O sistema tem como objetivo aumentar a segurança de idosos ao utilizar o fogão
 
 -Adicionar o sistema de notificação via Telegram da deteção de vazamentos.
 -Adicionar a válvula solenóide na saída do relé junto a um diodo de roda livre para proteção contra sobrecarga sob o relé.
+
+### 🎥 Vídeo Demonstrativo da Versão Final - Completo
+
+[Assista ao vídeo demonstrativo do Dispositivo de Monitoramento de Gases](https://youtu.be/_4dGmFTwYp0)
+
